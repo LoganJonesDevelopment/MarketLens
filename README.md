@@ -1,5 +1,7 @@
 # MarketLens
 
+Case study: [loganjones.dev/work/marketlens](https://loganjones.dev/work/marketlens/)
+
 A local-first market research pipeline. It ingests public sources — SEC EDGAR, wire RSS, company IR feeds, FRED/BLS/BEA, Federal Reserve communications, FTC/DOJ/SEC enforcement, the Federal Register, CourtListener, industry analysts, tech press, Reddit, Finnhub — plus on-host audio transcription of earnings calls, and turns the stream into typed events with computed importance and a research workspace where hypotheses accumulate stance-classified evidence over time. Everything runs on one machine: the database, the models, the data.
 
 ## Screenshots
