@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MarketLens.Api/MarketLens.Api.csproj" />
+    <Project Path="src/MarketLens.Core/MarketLens.Core.csproj" />
+    <Project Path="src/MarketLens.Infrastructure/MarketLens.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MarketLens.Infrastructure.Tests/MarketLens.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,129 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: marketlens-postgres
+    environment:
+      POSTGRES_USER: marketlens
+      POSTGRES_PASSWORD: marketlens
+      POSTGRES_DB: marketlens
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - marketlens_pg:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketlens -d marketlens"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.9
+    container_name: marketlens-embeddings
+    command: ["--model-id", "BAAI/bge-large-en-v1.5"]
+    ports:
+      - "127.0.0.1:5435:80"
+    volumes:
+      - marketlens_hf_cache:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  triage:
+    build:
+      context: ./triage
+    container_name: marketlens-triage
+    environment:
+      TRIAGE_MODEL: MoritzLaurer/deberta-v3-large-zeroshot-v2.0
+      TRIAGE_DEVICE: cuda
+    ports:
+      - "127.0.0.1:5436:80"
+    volumes:
+      - marketlens_hf_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  whisper:
+    build:
+      context: ./whisper
+    container_name: marketlens-whisper
+    environment:
+      WHISPER_MODEL: large-v3
+      WHISPER_DEVICE: cuda
+    ports:
+      - "127.0.0.1:5437:80"
+    volumes:
+      - marketlens_hf_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/MarketLens.Api/Dockerfile
+    container_name: marketlens-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=marketlens;Username=marketlens;Password=marketlens"
+      Embedding__BaseUrl: "http://embeddings:80"
+      Triage__BaseUrl:    "http://triage:80"
+      Whisper__BaseUrl:   "http://whisper:80"
+      Ollama__BaseUrl:    "http://host.docker.internal:11434"
+      Finnhub__ApiKey:    "${FINNHUB_API_KEY:-}"
+      Fred__ApiKey:       "${FRED_API_KEY:-}"
+      Eia__ApiKey:        "${EIA_API_KEY:-}"
+      BACKFILL_THIN_ARTICLES: "true"
+      BACKFILL_HISTORY: "false"
+      BACKFILL_FILING_CHUNKS: "true"
+    ports:
+      - "127.0.0.1:5210:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      embeddings:
+        condition: service_started
+      triage:
+        condition: service_started
+      whisper:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    image: node:22-alpine
+    container_name: marketlens-web
+    working_dir: /app
+    command: sh -c "npm install --no-audit --no-fund --prefer-offline && npm run dev"
+    environment:
+      VITE_API_PROXY_TARGET: "http://api:8080"
+    ports:
+      - "127.0.0.1:5216:5216"
+    volumes:
+      - ./web:/app
+      - marketlens_web_node_modules:/app/node_modules
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  marketlens_pg:
+  marketlens_hf_cache:
+  marketlens_web_node_modules:
